@@ -9,6 +9,7 @@ while True:
     # Find the hand and its landmarks
     hands, img = detector.findHands(img)  # with draw
     # hands = detector.findHands(img, draw=False)  # without draw
+    
 
     if hands:
         # Hand 1
@@ -19,10 +20,18 @@ while True:
         handType1 = hand1["type"]  # Handtype Left or Right
 
         fingers1 = detector.fingersUp(hand1)
-        print(fingers1.count(1))
+        #print(fingers1.count(1))
+        if fingers1.count(1) == 1:
+            # mode = write
+            coors = (lmList1[8][0], lmList1[8][1])
+        if fingers1.count(1) == 5:
+            # mode = erase
+            coors = (lmList1[12][0], lmList1[12][1])
         
+
     # Display
     cv2.imshow("Image", img)
-    cv2.waitKey(1)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 cap.release()
 cv2.destroyAllWindows()
