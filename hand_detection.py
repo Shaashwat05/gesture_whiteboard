@@ -30,6 +30,7 @@ while True:
             print(lmList1)
             fingers1 = detector.fingersUp(hand)
             #print(fingers1.count(1))
+            # img = cv2.circle(img, (lmList1[12][0], lmList1[12][1]), 10, (0, 0, 255), 10)
             if fingers1.count(1) == 1:
                 # mode = write
                 print("writing mode")
@@ -42,15 +43,17 @@ while True:
                 else:
                     # Draw the line on the canvas
                     print((x1[i],y1[i]),coors[i])
-                    canvas = cv2.line(canvas, (x1[i],y1[i]),(coors[i][0], coors[i][1]), [255,0,0], 10)
+                    canvas = cv2.line(canvas, (x1[i],y1[i]),(coors[i][0], coors[i][1]), [0,0,255], 10)
                 
                 # After the line is drawn the new points become the previous points.
                 x1[i],y1[i]= coors[i][0], coors[i][1]
-            if fingers1.count(1) == 5:
+            if fingers1.count(1) >3:
                 # mode = erase
                 coords = [lmList1[12][0], lmList1[12][1]]
-                print('erase coors', coords)
-                canvas[coords] = 0
+            #     print('erase coors', coords)
+                # print(canvas.shape, img.shape)
+                erase_size = 30
+                canvas[lmList1[12][1]-erase_size-1:lmList1[12][1]+erase_size, lmList1[12][0]-erase_size-1:lmList1[12][0]+erase_size] = 0
     img = cv2.add(img,canvas)
         
 
