@@ -6,13 +6,31 @@ import numpy as np
 
 
 model = load_model('mp_hand_gesture')
-# model_predict = load_model('models/QuickDraw.h5')
-# prediction_class_names = ["Apple","Bowtie","Candle","Door","Envelope","Fish","Guitar","Ice Cream","Lightning","Moon","Mountain","Star","Tent","Toothbrush","Wristwatch"]
+model_predict = load_model('QuickDraw.h5')
+prediction_class_names = ["Apple","Bowtie","Candle","Door","Envelope","Fish","Guitar","Ice Cream","Lightning","Moon","Mountain","Star","Tent","Toothbrush","Wristwatch"]
 # Load class names
 f = open('gesture.names', 'r')
 classNames = f.read().split('\n')
 f.close()
 print(classNames)
+
+def keras_predict(model_predict, image):
+    processed = keras_process_image(image)
+    # print("processed: " + str(processed.shape))
+    # print(model_predict.summary())
+    pred_probab = model_predict.predict(processed, verbose = 0)[0]
+    pred_class = list(pred_probab).index(max(pred_probab))
+    return max(pred_probab), pred_class
+
+
+def keras_process_image(img):
+    image_x = 28
+    image_y = 28
+    img = cv2.resize(img, (image_x, image_y))
+    print(img.shape)
+    img = np.array(img, dtype=np.float32)
+    img = np.reshape(img, (-1, image_x, image_y, 1))
+    return img
 
 cap = cv2.VideoCapture(0)
 detector = HandDetector(detectionCon=0.8, maxHands=2)
@@ -62,18 +80,23 @@ while True:
                 # print(className)
                 if fingers1.count(1) == 0 and (className == 'fist' or className == 'rock'):
                     canvas = np.zeros_like(img)
+                    x1, y1 = [0,0], [0,0]
+                    coors = [[0,0], [0,0]]
+                    break
 
-            elif fingers1.count(1) == 1 and handType1 == 'Right':
-                print('color select', color_picker_shape, img.shape)
+            if fingers1.count(1) == 1 and handType1 == 'Right':
+                # print('color select', color_picker_shape, img.shape)
                 select_coord = [lmList1[8][0], lmList1[8][1]]
                 print(select_coord)
                 if select_coord[1]< color_picker_shape[1] and select_coord[0]< color_picker_shape[0]:
                     color = color_options[select_coord[0]//color_size]#img[select_coord[1]][select_coord[0]]
                     print('color selected',color)
+                break
 
             if fingers1.count(1) == 1 and handType1 == 'Left':
                 # mode = write
-                print("writing mode")
+                # print("writing mode")
+                print(coors)
                 coors[i] = [lmList1[8][0], lmList1[8][1]]
                 if x1[i] == 0 and y1[i] == 0:
                     x1[i],y1[i]= coors[i][0], coors[i][1]
@@ -95,6 +118,27 @@ while True:
                 # print(canvas.shape, img.shape)
                 erase_size = 30
                 canvas[lmList1[12][1]-erase_size-1:lmList1[12][1]+erase_size, lmList1[12][0]-erase_size-1:lmList1[12][0]+erase_size] = 0
+    prediction_canvas = cv2.cvtColor(canvas, cv2.COLOR_BGR2GRAY)
+    blur1 = cv2.medianBlur(prediction_canvas, 15)
+    blur1 = cv2.GaussianBlur(blur1, (5, 5), 0)
+    thresh1 = cv2.threshold(blur1, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    blackboard_cnts = cv2.findContours(thresh1.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
+    if len(blackboard_cnts) >= 1:
+        cnt = max(blackboard_cnts, key=cv2.contourArea)
+        print(cv2.contourArea(cnt))
+        if cv2.contourArea(cnt) > 10000:
+            x, y, w, h = cv2.boundingRect(cnt)
+            digit = prediction_canvas[y:y + h, x:x + w]
+            print('digit shape', digit.shape)
+            pred_probab, pred_class = keras_predict(model_predict, digit)
+            print(pred_class, pred_probab)
+            print(pred_class, prediction_class_names[pred_class])
+            cv2.putText(img, prediction_class_names[pred_class], (img.shape[1]//2, img.shape[0] - 50) , cv2.FONT_HERSHEY_SIMPLEX, 4, (255,255,255), 4)
+
+
+    # prob, idx = keras_predict(model_predict, canvas)
+    # print(idx, prediction_class_names[idx])
+    # cv2.putText(img, prediction_class_names[idx], (1000, 50) , cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
     img = cv2.add(canvas,img)
     stacked = np.hstack((canvas,img))    
 
@@ -107,18 +151,3 @@ while True:
 cap.release()
 cv2.destroyAllWindows()
 
-def keras_predict(model_predict, image):
-    processed = keras_process_image(image)
-    print("processed: " + str(processed.shape))
-    pred_probab = model_predict.predict(processed)[0]
-    pred_class = list(pred_probab).index(max(pred_probab))
-    return max(pred_probab), pred_class
-
-
-def keras_process_image(img):
-    image_x = 28
-    image_y = 28
-    img = cv2.resize(img, (image_x, image_y))
-    img = np.array(img, dtype=np.float32)
-    img = np.reshape(img, (-1, image_x, image_y, 1))
-    return img
