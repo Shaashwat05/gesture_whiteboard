@@ -6,7 +6,8 @@ import numpy as np
 
 
 model = load_model('mp_hand_gesture')
-
+# model_predict = load_model('models/QuickDraw.h5')
+# prediction_class_names = ["Apple","Bowtie","Candle","Door","Envelope","Fish","Guitar","Ice Cream","Lightning","Moon","Mountain","Star","Tent","Toothbrush","Wristwatch"]
 # Load class names
 f = open('gesture.names', 'r')
 classNames = f.read().split('\n')
@@ -48,18 +49,21 @@ while True:
             centerPoint1 = hand['center']  # center of the hand cx,cy
             handType1 = hand["type"]
 
-            prediction = model.predict([np.array(lmList1)[:, :2].tolist()], verbose=0)
-            classID = np.argmax(prediction)
-            className = classNames[classID]
+            
           # Handtype Left or Right
             # print(lmList1)
             fingers1 = detector.fingersUp(hand)
             #print(fingers1.count(1))
             # img = cv2.circle(img, (lmList1[12][0], lmList1[12][1]), 10, (0, 0, 255), 10)
-            if className == 'Fist':
-                canvas = np.zeros_like(img)
+            if handType1 == 'Right':
+                prediction = model.predict([np.array(lmList1)[:, :2].tolist()], verbose=0)
+                classID = np.argmax(prediction)
+                className = classNames[classID]
+                # print(className)
+                if fingers1.count(1) == 0 and (className == 'fist' or className == 'rock'):
+                    canvas = np.zeros_like(img)
 
-            if fingers1.count(1) == 1 and handType1 == 'Right':
+            elif fingers1.count(1) == 1 and handType1 == 'Right':
                 print('color select', color_picker_shape, img.shape)
                 select_coord = [lmList1[8][0], lmList1[8][1]]
                 print(select_coord)
@@ -91,12 +95,30 @@ while True:
                 # print(canvas.shape, img.shape)
                 erase_size = 30
                 canvas[lmList1[12][1]-erase_size-1:lmList1[12][1]+erase_size, lmList1[12][0]-erase_size-1:lmList1[12][0]+erase_size] = 0
-    img = cv2.add(img,canvas)
-        
+    img = cv2.add(canvas,img)
+    stacked = np.hstack((canvas,img))    
 
     # Display
-    cv2.imshow("Image", img)
+    # cv2.imshow("Image", img)
+    cv2.imshow("Image", stacked)
+
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 cap.release()
 cv2.destroyAllWindows()
+
+def keras_predict(model_predict, image):
+    processed = keras_process_image(image)
+    print("processed: " + str(processed.shape))
+    pred_probab = model_predict.predict(processed)[0]
+    pred_class = list(pred_probab).index(max(pred_probab))
+    return max(pred_probab), pred_class
+
+
+def keras_process_image(img):
+    image_x = 28
+    image_y = 28
+    img = cv2.resize(img, (image_x, image_y))
+    img = np.array(img, dtype=np.float32)
+    img = np.reshape(img, (-1, image_x, image_y, 1))
+    return img
