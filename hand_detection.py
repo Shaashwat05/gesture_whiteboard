@@ -3,6 +3,7 @@ import cv2
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 import numpy as np
+import time
 
 
 model = load_model('mp_hand_gesture')
@@ -12,8 +13,8 @@ prediction_class_names = ["Apple","Bowtie","Candle","Door","Envelope","Fish","Gu
 f = open('gesture.names', 'r')
 classNames = f.read().split('\n')
 f.close()
-print(classNames)
-
+# print(classNames)
+open_screen = True
 def keras_predict(model_predict, image):
     processed = keras_process_image(image)
     # print("processed: " + str(processed.shape))
@@ -27,7 +28,7 @@ def keras_process_image(img):
     image_x = 28
     image_y = 28
     img = cv2.resize(img, (image_x, image_y))
-    print(img.shape)
+    # print(img.shape)
     img = np.array(img, dtype=np.float32)
     img = np.reshape(img, (-1, image_x, image_y, 1))
     return img
@@ -38,10 +39,56 @@ x1, y1 = [0,0], [0,0]
 coors = [[0,0], [0,0]]
 canvas = None
 color = [0,0,255]
+mode = 'pictionary'
+starttime = time.time()
+instructions_img = cv2.imread('instruction.png')
+# print(instructions_img.shape)
+while starttime and ((time.time() - starttime) < 5):
+    instructions_img = cv2.resize(instructions_img, (1920, 1080))
+    # img = cv2.addWeighted(img, 0, instructions_img, 1, 0)
+    # print('in the right loop')
+    cv2.imshow("Image", instructions_img)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 while True:
     # Get image frame
     success, img = cap.read()
     img = cv2.flip( img, 1 )
+    # print('open_screen', open_screen)
+    if open_screen == True:
+        og_img = img
+        # print(img.shape)
+        open_screen_img = cv2.imread('open_screen.png')
+        # print(open_screen_img.shape)
+        open_screen_img = cv2.resize(open_screen_img, (img.shape[1], img.shape[0]))
+        # print(open_screen_img.shape)
+        img = cv2.addWeighted(img, 0, open_screen_img, 1, 0)
+        hands, _ = detector.findHands(og_img)
+        if hands:
+            hand1 = hands[0]
+            centerPoint1 = hand1['center']
+            if centerPoint1[0] < img.shape[1]//2:
+                mode = 'freedraw'
+                # starttime = time.time()
+            else:
+                mode = 'pictionary'
+                # starttime = time.time()
+           
+                # print('time > 5')
+            open_screen = False
+            continue
+        # img = cv2.add(canvas,img)
+        # stacked = np.hstack((canvas,img))    
+
+        # Display
+        # cv2.imshow("Image", img)
+        cv2.imshow("Image", img)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        continue
+    # print((time.time() - starttime))
+    # print((time.time() - starttime) < 5)
     # color_picker = cv2.imread('color_picker.png')
     # img[:color_picker.shape[0],:color_picker.shape[1]] = color_picker
     color_options = [(000,000,000),(255,255,255),(127,127,127),(195,195,195),(136,000,21),(185,122,87),(237,28,36),(255,174,201),(255,127,39),(255,201,14),(255,242,000),(239,228,176),(34,177,76),(181,230,29),(000,162,232),(153,217,234),(63,72,204),(112,146,190),(163,73,164),(200,191,231)]
@@ -83,20 +130,23 @@ while True:
                     x1, y1 = [0,0], [0,0]
                     coors = [[0,0], [0,0]]
                     break
+                if className == 'peace':
+                    cv2.imwrite(f'canvas_{int(time.time())}.png', canvas)
+                    # cv2.imwrite(f'img_{int(time.time())}.png', img)
 
             if fingers1.count(1) == 1 and handType1 == 'Right':
                 # print('color select', color_picker_shape, img.shape)
                 select_coord = [lmList1[8][0], lmList1[8][1]]
-                print(select_coord)
+                # print(select_coord)
                 if select_coord[1]< color_picker_shape[1] and select_coord[0]< color_picker_shape[0]:
                     color = color_options[select_coord[0]//color_size]#img[select_coord[1]][select_coord[0]]
-                    print('color selected',color)
+                    # print('color selected',color)
                 break
 
             if fingers1.count(1) == 1 and handType1 == 'Left':
                 # mode = write
                 # print("writing mode")
-                print(coors)
+                # print(coors)
                 coors[i] = [lmList1[8][0], lmList1[8][1]]
                 if x1[i] == 0 and y1[i] == 0:
                     x1[i],y1[i]= coors[i][0], coors[i][1]
@@ -106,34 +156,41 @@ while True:
                 else:
                     # Draw the line on the canvas
                     # print((x1[i],y1[i]),coors[i])
-                    print('write with color' , color)
+                    # print('write with color' , color)
                     canvas = cv2.line(canvas, (x1[i],y1[i]),(coors[i][0], coors[i][1]), (int(color[0]), int(color[1]), int(color[2])), 10)
+                    # canvas = cv2.circle(canvas, (coors[i][0], coors[i][1]), 10, (int(color[0]), int(color[1]), int(color[2])), -1)
                 
                 # After the line is drawn the new points become the previous points.
                 x1[i],y1[i]= coors[i][0], coors[i][1]
-            if fingers1.count(1) >3 and handType1 == 'Left':
+            elif fingers1.count(1) >3 and handType1 == 'Left':
                 # mode = erase
                 coords = [lmList1[12][0], lmList1[12][1]]
             #     print('erase coors', coords)
                 # print(canvas.shape, img.shape)
                 erase_size = 30
                 canvas[lmList1[12][1]-erase_size-1:lmList1[12][1]+erase_size, lmList1[12][0]-erase_size-1:lmList1[12][0]+erase_size] = 0
-    prediction_canvas = cv2.cvtColor(canvas, cv2.COLOR_BGR2GRAY)
-    blur1 = cv2.medianBlur(prediction_canvas, 15)
-    blur1 = cv2.GaussianBlur(blur1, (5, 5), 0)
-    thresh1 = cv2.threshold(blur1, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-    blackboard_cnts = cv2.findContours(thresh1.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
-    if len(blackboard_cnts) >= 1:
-        cnt = max(blackboard_cnts, key=cv2.contourArea)
-        print(cv2.contourArea(cnt))
-        if cv2.contourArea(cnt) > 10000:
-            x, y, w, h = cv2.boundingRect(cnt)
-            digit = prediction_canvas[y:y + h, x:x + w]
-            print('digit shape', digit.shape)
-            pred_probab, pred_class = keras_predict(model_predict, digit)
-            print(pred_class, pred_probab)
-            print(pred_class, prediction_class_names[pred_class])
-            cv2.putText(img, prediction_class_names[pred_class], (img.shape[1]//2, img.shape[0] - 50) , cv2.FONT_HERSHEY_SIMPLEX, 4, (255,255,255), 4)
+                x1, y1 = [0,0], [0,0]
+                coors = [[0,0], [0,0]]
+            else:
+                x1, y1 = [0,0], [0,0]
+                coors = [[0,0], [0,0]]
+    if mode == 'pictionary':
+        prediction_canvas = cv2.cvtColor(canvas, cv2.COLOR_BGR2GRAY)
+        blur1 = cv2.medianBlur(prediction_canvas, 15)
+        blur1 = cv2.GaussianBlur(blur1, (5, 5), 0)
+        thresh1 = cv2.threshold(blur1, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+        blackboard_cnts = cv2.findContours(thresh1.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
+        if len(blackboard_cnts) >= 1:
+            cnt = max(blackboard_cnts, key=cv2.contourArea)
+            # print(cv2.contourArea(cnt))
+            if cv2.contourArea(cnt) > 10000:
+                x, y, w, h = cv2.boundingRect(cnt)
+                digit = prediction_canvas[y:y + h, x:x + w]
+                # print('digit shape', digit.shape)
+                pred_probab, pred_class = keras_predict(model_predict, digit)
+                # print(pred_class, pred_probab)
+                # print(pred_class, prediction_class_names[pred_class])
+                cv2.putText(img, prediction_class_names[pred_class], (img.shape[1]//2, img.shape[0] - 50) , cv2.FONT_HERSHEY_SIMPLEX, 4, (255,255,255), 4)
 
 
     # prob, idx = keras_predict(model_predict, canvas)
